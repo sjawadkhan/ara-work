@@ -1,0 +1,4 @@
+aws_region: ap-southeast-2
+product: ara-api
+environ: dev
+# ec2_tag_name is through command-line

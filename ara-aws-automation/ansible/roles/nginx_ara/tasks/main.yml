@@ -1,0 +1,38 @@
+---
+- name: Apt | Install Nginx
+  apt:
+    name: nginx
+    state: present
+    update_cache: true
+
+- name: Systemd | Starting and Enabling Nginx service
+  systemd:
+    name: nginx
+    state: started
+    enabled: true
+
+- name: Nginx | removing default config file
+  file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+
+- name: Nginx | Copy default configuration file to /etc/nginx/sites-enabled
+  get_url:
+    url: "{{ file_url }}" # "https://raw.githubusercontent.com/sjawadkhan/default/main/default"
+    dest: "/etc/nginx/sites-enabled/default"
+
+- name: Systemd | Restarting Nginx service
+  systemd:
+    name: nginx
+    state: restarted
+
+- name: Replace | Replace proxy_pass in nginx configuration file
+  ansible.builtin.replace:
+    path: "{{ nginx_conf_path }}"
+    regexp: "{{ original_proxy_pass }}"
+    replace: "{{ new_proxy_pass }}"
+
+- name: Systemd | Restarting Nginx service
+  systemd:
+    name: nginx
+    state: restarted

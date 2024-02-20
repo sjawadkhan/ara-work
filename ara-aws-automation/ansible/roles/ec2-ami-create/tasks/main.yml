@@ -1,0 +1,53 @@
+---
+
+- name: AMI Creation | Creating AMI from running EC2
+  amazon.aws.ec2_ami:
+    instance_id: "{{ ec2_arainstance_id }}"
+    name: "{{ ara_ami_name }}"
+    wait: true
+    region: "{{ aws_region }}"
+    tags:
+      Name: "{{ product }}-{{ environ }}-AMI-app"
+  register: ami_result
+
+- name: AMI Creation | Displaying created AMI ID of created Image
+  debug:
+    var: ami_result.image_id
+
+- name: AMI Creation | Saving created AMI ID to a file
+  copy:
+    content: "{{ ami_result.image_id }}"
+    dest: ../ara_image_id.txt
+
+- name: AMI Destroy | Terminating original EC2 instance
+  amazon.aws.ec2_instance:
+    region: "{{ aws_region }}"
+    instance_ids:
+      - "{{ ec2_arainstance_id }}"
+    state: absent
+
+- name: AMI Creation | Creating AMI from running EC2
+  amazon.aws.ec2_ami:
+    instance_id: "{{ ec2_nginxinstance_id }}"
+    name: "{{ nginx_ami_name }}"
+    wait: true
+    region: "{{ aws_region }}"
+    tags:
+      Name: "{{ product }}-{{ environ }}-AMI-reverse-app"
+  register: ami_result
+
+- name: AMI Creation | Displaying created AMI ID of created Image
+  debug:
+    var: ami_result.image_id
+
+- name: AMI Creation | Saving created AMI ID to a file
+  copy:
+    content: "{{ ami_result.image_id }}"
+    dest: ../nginx_image_id.txt
+
+- name: AMI Destroy | Terminating original EC2 instance
+  amazon.aws.ec2_instance:
+    region: "{{ aws_region }}"
+    instance_ids:
+      - "{{ ec2_nginxinstance_id }}"
+    state: absent

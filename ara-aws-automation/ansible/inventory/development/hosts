@@ -1,0 +1,7 @@
+[bastion]
+nginx
+
+[private]
+ara
+
+

@@ -1,0 +1,119 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Parameters:
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Default: ansible-ara
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instances
+  
+  AraTargetGroup:
+    Type: String # AWS::ElasticLoadBalancingV2::TargetGroup
+    Description: TargetGroup for Ara LoadBalancer
+  NginxTargetGroup:
+    Type: String # AWS::ElasticLoadBalancingV2::TargetGroup
+    Description: TargetGroup for Ara LoadBalancer
+
+  AraEc2SG:
+    Type: "String"
+    Description: "Ara Security Group created in original stack"
+  NginxEc2SG:
+    Type: "String"
+    Description: "Nginc Security Group created in original stack"
+    
+  PrivateSubnet1Id:
+    Type: "String"
+    Description: Private Subnet1 created in original stack
+  PrivateSubnet2Id:
+    Type: "String"
+    Description: Private Subnet1 created in original stack
+
+  VpcId:
+    Type: "AWS::EC2::VPC::Id"
+    Description: "VPC created in original stack"
+  
+  araAMIid:
+    Type: String
+    Description: "The ami id of ara-ec2"
+
+  nginxAMIid:
+    Type: String
+    Description: "The ami id of nginx-ec2"
+  
+  Product:
+    Type: String
+    Description: The product name for the EC2 instance.
+    Default: Ara-Api
+
+  Environment:
+    Type: String
+    Description: Environment Name
+    Default: Dev
+        
+
+
+Resources:
+  ARALaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties: 
+      LaunchTemplateName: ARALaunchTemplate
+      LaunchTemplateData:
+        NetworkInterfaces:
+          - DeviceIndex: 0
+            AssociatePublicIpAddress: false
+            Groups:
+              - !Ref AraEc2SG
+        ImageId: !Ref araAMIid
+        InstanceType: t2.micro
+        KeyName: !Ref KeyName
+
+  ARAAutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      LaunchTemplate:
+        LaunchTemplateId: !Ref ARALaunchTemplate
+        Version: !GetAtt ARALaunchTemplate.LatestVersionNumber
+      MinSize: '1'
+      MaxSize: '3'
+      DesiredCapacity: 1
+      VPCZoneIdentifier:   
+        - !Ref PrivateSubnet1Id
+        - !Ref PrivateSubnet2Id
+      TargetGroupARNs: 
+        - !Ref AraTargetGroup
+      Tags:
+        - Key: Name
+          Value: !Join ['', [!Ref "Product", "-", !Ref "Environment", "-", "ASG", "-", "AraScaling"]] 
+          PropagateAtLaunch: true
+
+  NGINXLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties: 
+      LaunchTemplateName: NGINXLaunchTemplate
+      LaunchTemplateData:
+        NetworkInterfaces:
+          - DeviceIndex: 0
+            AssociatePublicIpAddress: false
+            Groups:
+              - !Ref NginxEc2SG
+        ImageId: !Ref nginxAMIid
+        InstanceType: t2.micro
+        KeyName: !Ref KeyName
+
+  NGINXAutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      LaunchTemplate:
+        LaunchTemplateId: !Ref NGINXLaunchTemplate
+        Version: !GetAtt NGINXLaunchTemplate.LatestVersionNumber
+      MinSize: '1'
+      MaxSize: '3'
+      DesiredCapacity: 1
+      VPCZoneIdentifier:   
+        - !Ref PrivateSubnet1Id
+        - !Ref PrivateSubnet2Id
+      TargetGroupARNs: 
+        - !Ref NginxTargetGroup
+      Tags:
+        - Key: Name
+          Value: !Join ['', [!Ref "Product", "-", !Ref "Environment", "-", "ASG", "-", "NginxScaling"]]
+          PropagateAtLaunch: true

@@ -1,0 +1,7 @@
+---
+- name: Ara_Api | Install ARA with Cusom settings and persistent API server using vars
+  hosts: private
+  gather_facts: yes
+
+  roles:
+    - ara_api

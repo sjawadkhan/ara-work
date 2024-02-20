@@ -1,0 +1,4 @@
+nginx_conf_path: "/etc/nginx/sites-enabled/default"
+original_proxy_pass: "http://10.0.2.28:8000"
+new_proxy_pass: "http://10.0.2.9:8000"
+file_url: "https://raw.githubusercontent.com/sjawadkhan/default/main/default"

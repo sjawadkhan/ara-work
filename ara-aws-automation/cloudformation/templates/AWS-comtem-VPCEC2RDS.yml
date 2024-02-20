@@ -1,0 +1,535 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Parameters:
+  VpcCidrBlock:
+    Type: String
+    Default: 10.0.0.0/16
+    Description: CIDR Block for the Virtual Private Cloud
+  PublicSubnet1CidrBlock:
+    Type: String
+    Default: 10.0.1.0/24
+    Description: CIDR Block for the Public Subnet Segment
+  PublicSubnet2CidrBlock:
+    Type: String
+    Default: 10.0.3.0/24
+    Description: CIDR Block for the Public Subnet Segment
+  PrivateSubnet1CidrBlock:
+    Type: String
+    Default: 10.0.2.0/24
+    Description: CIDR Block for the Public Subnet Segment
+  PrivateSubnet2CidrBlock:
+    Type: String
+    Default: 10.0.4.0/24
+    Description: CIDR Block for the Public Subnet Segment
+  PublicSubnetAZ:
+    Type: String
+    Default: ap-southeast-2a
+    Description: Designated Avalability Zone for the Private Subnet Segment
+  PrivateSubnetAZ:
+    Type: String
+    Default: ap-southeast-2b
+    Description: Designated Avalability Zone for the Private Subnet Segment
+  InstanceType:
+    Type: String
+    Default: t2.micro
+  ImageId:
+    Type: AWS::EC2::Image::Id
+    Default: ami-08e168f4c7bff7921
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Default: ansible-ara
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instances
+  
+  RDSSGName:
+    Type: String
+    Description: RDS subnet Group Name required to create subnet group - add subnets to group
+    Default: testing-rds
+  DBInstanceIdentifier:
+    Type: String
+    Default: postgresql-dbi
+    Description: Identifier(Name) of RDS DB instance
+  DBAllocatedStorage:
+    Type: String
+    Description: Amount of GB allocated to DB Instance
+    Default: '20'
+  DBInstanceClass:
+    Type: String
+    Description: Instance class assigned to db instance
+    Default: db.t3.micro
+  EngineName:
+    Type: String
+    AllowedValues: [postgres]
+    Default: postgres
+  DBMasterUsername:
+    Type: String
+    Description: Username for RDS DB
+    Default: testing
+  DBMasterPassword:
+    Type: String
+    Description: Password for your DB user
+    Default: testing123
+    NoEcho: True
+  DBName:
+    Type: String
+    Default: Jawad
+    Description: Database name for rds instance
+
+  ## Parameters for Naming Standard
+  Product:
+    Type: String
+    Description: The product name for the EC2 instance.
+    Default: Ara-Api
+
+  Environment:
+    Type: String
+    Description: The environment (e.g., dev, test, prod).
+    Default: Dev
+
+Resources:
+  ## VPC
+  PubPrivateVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidrBlock #10.0.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Join ['', [!Ref "Product", "-", !Ref "Environment", "-", "VPC", "-", !Ref "AWS::Region", "-", "Ara-VPC"]]
+          # !Join ['', [!Ref "AWS::StackName", "-VPC"]]
+
+  ## Public_Subnet1     
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref PubPrivateVPC
+      AvailabilityZone: !Ref PublicSubnetAZ
+      CidrBlock: !Ref PublicSubnet1CidrBlock
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Join ['', [!Ref "Product", "-", !Ref "Environment", "-", "Subnet", "-", !Ref "AWS::Region", "-", !Ref "PublicSubnetAZ", "-1", "-", "PublicSubnet1"]]
+          # !Join ['', [!Ref "AWS::StackName", "-Pub-SubNet1"]]
+
+  ## Public_Subnet2    
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref PubPrivateVPC
+      AvailabilityZone: !Ref PrivateSubnetAZ
+      CidrBlock: !Ref PublicSubnet2CidrBlock
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Join ['', [!Ref "Product", "-", !Ref "Environment", "-", "Subnet", "-", !Ref "AWS::Region", "-", !Ref "PublicSubnetAZ", "-2", "-", "PublicSubnet2"]]
+          # !Join ['', [!Ref "AWS::StackName", "-Pub-SubNet2"]]
+
+  ## Private_Subnet1   
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref PubPrivateVPC
+      AvailabilityZone: !Ref PublicSubnetAZ
+      CidrBlock: !Ref PrivateSubnet1CidrBlock
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Join ['', [!Ref "Product", "-", !Ref "Environment", "-", "Subnet", "-", !Ref "AWS::Region", "-", !Ref "PrivateSubnetAZ", "-1", "-", "PrivateSubnet1"]]
+          # !Join ['', [!Ref "AWS::StackName", "-Pri-SubNet1"]]
+
+  ## Private_Subnet2
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref PubPrivateVPC
+      AvailabilityZone: !Ref PrivateSubnetAZ
+      CidrBlock: !Ref PrivateSubnet2CidrBlock
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Join ['', [!Ref "Product", "-", !Ref "Environment", "-", "Subnet", "-", !Ref "AWS::Region", "-", !Ref "PrivateSubnetAZ", "-2", "-", "PrivateSubnet2"]]
+          # !Join ['', [!Ref "AWS::StackName", "-Pri-SubNet2"]]
+
+     
+  ## INTERNET GATEWAY
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Join ['', [!Ref "Product", "-", !Ref "Environment", "-", "IGW", "-", "Ara-VPC"]]
+          # !Join ['', [!Ref "AWS::StackName", "-IGW"]]
+
+  ## connect IGW with Public Subnet    
+  GatewayToInternet:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref PubPrivateVPC
+      InternetGatewayId: !Ref InternetGateway
+      
+  ## PUBLIC ROUTING
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref PubPrivateVPC
+      Tags: 
+        - Key: Name
+          Value: !Join ['', [!Ref "Product", "-", !Ref "Environment", "-", "PubRT", "-", "Ara-VPC"]]
+          # !Join ['', [!Ref "AWS::StackName", "-Pub-RTB"]]
+
+  ## Public Route Entries   
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: GatewayToInternet
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+  
+  ## PublicSubnet1RouteTableAssociation
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref PublicRouteTable
+
+  ## PublicSubnet2RouteTableAssociation   
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref PublicRouteTable
+     
+  ## NAT GATEWAY
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties: 
+      SubnetId: !Ref PublicSubnet1
+      AllocationId: !GetAtt NatPublicIP.AllocationId
+      Tags: 
+        - Key: Name
+          Value: !Join ['', [!Ref "Product", "-", !Ref "Environment", "-", "NATGW", "-", !Ref "PublicSubnet1", "-", "Ara-VPC"]] 
+          # !Join ['', [!Ref "AWS::StackName", "-NGW"]]
+
+  ## ELASTIC IP
+  NatPublicIP:
+    Type: AWS::EC2::EIP
+    # DependsOn: PubPrivateVPC
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value:  !Join ['', [!Ref "Product", "-", !Ref "Environment", "-", "EIP", "-", "Ara-VPC"]] 
+          # !Join ['', [!Ref "AWS::StackName", "-NGW-EIP"]]      
+     
+  ## PRIVATE ROUTING
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref PubPrivateVPC
+      Tags: 
+        - Key: Name
+          Value: !Join ['', [!Ref "Product", "-", !Ref "Environment", "-", "PriRT", "-", "Ara-VPC"]]  
+          # !Join ['', [!Ref "AWS::StackName", "-Priv-RTB"]]
+
+  ## Routes traffic to NGW - connect privateroutetable to NGW   
+  PrivateRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      NatGatewayId: !Ref NatGateway
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+
+  ## PrivateSubnet1RouteTableAssociation   
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet1
+      RouteTableId: !Ref PrivateRouteTable
+
+  ## PrivateSubnet2RouteTableAssociation   
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet2
+      RouteTableId: !Ref PrivateRouteTable
+
+  ## EC2 Instance for Ara_Api
+  AraEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref 'InstanceType'
+      KeyName: !Ref KeyName
+      ImageId: !Ref ImageId
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: "false"
+          DeviceIndex: "0"
+          GroupSet: 
+            - Ref: AraEC2SecurityGroup 
+          SubnetId: !Ref PrivateSubnet1
+      Tags:
+        - Key: Name
+          Value: !Join ['', [!Ref "Product", "-", !Ref "Environment", "-", "EC2", "-", !Ref "AWS::Region", "-", "Ara-VPC"]]  
+          # !Join ['', [!Ref "AWS::StackName", "-Ara-EC2"]]
+
+  ## Nginx Instance for Reverse Proxy        
+  NginxEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref 'InstanceType'
+      KeyName: !Ref KeyName
+      ImageId: !Ref ImageId
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: "true"
+          DeviceIndex: "0"
+          GroupSet: 
+            - Ref: NginxEC2SecurityGroup
+          SubnetId: !Ref PublicSubnet1
+      Tags:
+        - Key: Name
+          Value: !Join ['', [!Ref "Product", "-", !Ref "Environment", "-", "EC2", "-", !Ref "AWS::Region", "-", "Nginx-RP"]]   
+          # !Join ['', [!Ref "AWS::StackName", "-Nginx-EC2"]]
+
+  ## Security Group for Ara_server
+  AraEC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow http to client host
+      VpcId: !Ref PubPrivateVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 8000
+          ToPort: 8000
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Join ['', [!Ref "Product", "-", !Ref "Environment", "-", "SG", "-", "Ara-SG"]]   
+          # !Join ['', [!Ref "AWS::StackName", "-Ara-SG"]]
+
+  ## Security Group for Nginx Server
+  NginxEC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow http to client host
+      VpcId: !Ref PubPrivateVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Join ['', [!Ref "Product", "-", !Ref "Environment", "-", "SG", "-", "Nginx-SG"]]  
+          # !Join ['', [!Ref "AWS::StackName", "-Nginx-SG"]]
+
+  ## RDS Subnet Group to associate subnets with RDS Instance
+  RDSSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: "testing db subnet group"
+      DBSubnetGroupName: !Ref RDSSGName
+      SubnetIds: 
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      Tags:
+        - Key: Name
+          Value: !Join ['', [!Ref "Product", "-", !Ref "Environment", "-", "RDS-SG", "-", "Postgres"]] 
+
+  ## RDS-Postgres Instance      
+  RDSInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBName: !Ref DBName
+      DBInstanceIdentifier: !Ref DBInstanceIdentifier
+      AllocatedStorage: !Ref DBAllocatedStorage
+      DBInstanceClass: !Ref DBInstanceClass
+      Engine: !Ref EngineName
+      MasterUsername: !Ref DBMasterUsername
+      MasterUserPassword: !Ref DBMasterPassword
+      PubliclyAccessible: true
+      VPCSecurityGroups:
+         - !Ref AraEC2SecurityGroup
+      DBSubnetGroupName: !Ref RDSSubnetGroup
+      Tags:
+        - Key: Name
+          Value: !Join ['', [!Ref "Product", "-", !Ref "Environment", "-", "RDS", "-", "Postgres", !Ref "AWS::Region", "-", "DB for Ara"]] 
+
+
+  NginxLoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for ALB
+      VpcId: !Ref PubPrivateVPC # Replace with your VPC ID
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0 
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Join ['', [!Ref "Product", "-", !Ref "Environment", "-", "SG", "-", "NGINXALB"]]
+
+  NginxLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    DependsOn: InternetGateway
+    Properties:
+      Scheme: internet-facing
+      Subnets: 
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+      SecurityGroups:
+        - !GetAtt NginxLoadBalancerSecurityGroup.GroupId # Replace with your load balancer security group ID
+      Tags:
+        - Key: Name
+          Value: !Join ['', [!Ref "Product", "-", !Ref "Environment", "-", "ALB", "-", "forwardtoPri", "-", "public"]]
+
+  NginxTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    DependsOn: NginxLoadBalancer
+    Properties:
+      Name: NginxTargetGroup
+      Port: 80
+      Protocol: HTTP
+      VpcId: !Ref PubPrivateVPC # Replace with your VPC ID
+      HealthCheckPath: /
+      Tags:
+        - Key: Name
+          Value: !Join ['', [!Ref "Product", "-", !Ref "Environment", "-", "TG", "-", "NginxTG"]]
+
+  NginxListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref NginxTargetGroup
+      LoadBalancerArn: !Ref NginxLoadBalancer
+      Port: 80
+      Protocol: HTTP
+
+  AraLoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for AraALB
+      VpcId: !Ref PubPrivateVPC # Replace with your VPC ID
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8000
+          ToPort: 8000
+          CidrIp: 0.0.0.0/0 
+      Tags:
+        - Key: Name
+          Value: !Join ['', [!Ref "Product", "-", !Ref "Environment", "-", "SG", "-", "ARAALB"]]
+
+  AraLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    DependsOn: PubPrivateVPC
+    Properties:
+      Scheme: internal
+      Subnets: 
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      SecurityGroups:
+        - !GetAtt AraLoadBalancerSecurityGroup.GroupId # Replace with your load balancer security group ID
+      Tags:
+        - Key: Name
+          Value: !Join ['', [!Ref "Product", "-", !Ref "Environment", "-", "ALB", "-", "forwardtoaraEc2", "-", "private"]]
+
+  AraTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    DependsOn: AraLoadBalancer
+    Properties:
+      Name: AraTargetGroup
+      Port: 8000
+      Protocol: HTTP
+      VpcId: !Ref PubPrivateVPC # Replace with your VPC ID
+      HealthCheckPath: /
+      Tags:
+        - Key: Name
+          Value: !Join ['', [!Ref "Product", "-", !Ref "Environment", "-", "TG", "-", "ARATG"]]
+
+  AraListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref AraTargetGroup
+      LoadBalancerArn: !Ref AraLoadBalancer
+      Port: 8000
+      Protocol: HTTP
+
+Outputs:
+  ## VPC, Subnet outputs
+  VpcId:
+    Description: Unique identifier of the VPC 
+    Value: !Ref PubPrivateVPC
+  PublicSubnet1Id:
+    Description: Unique identifier of the Public Subnet segment of the VPC
+    Value: !Ref PublicSubnet1
+  PrivateSubnet1Id:
+    Description: Unique identifier of the Private Subnet segment of the VPC
+    Value: !Ref PrivateSubnet1
+  PublicSubnet2Id:
+    Description: Unique identifier of the Public Subnet segment of the VPC
+    Value: !Ref PublicSubnet2
+  PrivateSubnet2Id:
+    Description: Unique identifier of the Private Subnet segment of the VPC
+    Value: !Ref PrivateSubnet2
+ 
+  ## EC2, SG outputs
+  AraEc2Id:
+    Description: Name of Server created for Ara
+    Value: !Ref AraEC2Instance
+  AraEC2InstanceIP:
+    Value: !GetAtt AraEC2Instance.PrivateIp
+  NginxEc2Id:
+    Description: Name of Server created for Nginx
+    Value: !Ref NginxEC2Instance
+  NginxEC2InstanceIP:
+    Value: !GetAtt NginxEC2Instance.PublicIp
+  AraEc2SG:
+    Description: Name of Server created for Ara
+    Value: !Ref AraEC2SecurityGroup
+    Export:
+      Name: AraEC2SecurityGroup
+  NginxEc2SG:
+    Description: Name of Server created for Nginx
+    Value: !Ref NginxEC2SecurityGroup
+    Export:
+      Name: NginxEC2SecurityGroup
+  
+  ## RDS-postgresql outputs
+  RDSInstanceEndpoint:
+    Description: Endpoint for the created RDS InstanceType
+    Value: !GetAtt RDSInstance.Endpoint.Address
+
+  ## Load Balancers outputs
+  NGINXLoadBalancerDNSName:
+    Description: DNS name of NGINX load balancer
+    Value: !GetAtt NginxLoadBalancer.DNSName
+
+  AraLoadBalancerDNSName:
+    Description: DNS name of Ara load balancer
+    Value: !GetAtt AraLoadBalancer.DNSName
+
+  NginxTargetGroupARN:
+    Description: ARN of the Nginx target group
+    Value: !Ref NginxTargetGroup
+
+  AraTargetGroupARN:
+    Description: ARN of the Ara target group
+    Value: !Ref AraTargetGroup

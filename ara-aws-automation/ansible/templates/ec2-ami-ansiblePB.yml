@@ -1,0 +1,8 @@
+---
+- name: AWS AMI-Compute | Create AMI from EC2 instance and Remove original EC2 instance
+  hosts: localhost
+  gather_facts: true
+  
+  roles:
+    - ec2-ami-create
+    

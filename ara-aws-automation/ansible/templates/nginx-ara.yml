@@ -1,0 +1,9 @@
+---
+- name: Nginx | Install and configure Nginx as Reverse Proxy by replacing default config file
+  hosts: bastion
+  gather_facts: yes
+  become: true
+
+  roles:
+    - nginx_ara
+    
